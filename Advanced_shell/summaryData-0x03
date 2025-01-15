@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+
+# Define the list of Pokémon files (assuming they are named like pokemon_name.json)
+POKEMON_LIST=("bulbasaur.json" "ivysaur.json" "venusaur.json" "charmander.json" "charmeleon.json")
+OUTPUT_CSV="pokemon_report.csv"
+ERROR_FILE="errors.txt"
+
+# Initialize the CSV file with headers
+echo "Name,Height,Weight" > "$OUTPUT_CSV"
+
+# Initialize variables to calculate averages
+total_height=0
+total_weight=0
+count=0
+
+# Process each JSON file
+for POKEMON_FILE in "${POKEMON_LIST[@]}"; do
+  if [[ -f "$POKEMON_FILE" ]]; then
+    # Extract name, height, and weight from the JSON file
+    name=$(jq -r '.name' "$POKEMON_FILE")
+    height=$(jq -r '.height' "$POKEMON_FILE")
+    weight=$(jq -r '.weight' "$POKEMON_FILE")
+    
+    # Check if the values are valid numbers
+    if [[ "$height" =~ ^[0-9]+(\.[0-9]+)?$ ]] && [[ "$weight" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+      # Add data to the CSV
+      echo "$name,$height,$weight" >> "$OUTPUT_CSV"
+      
+      # Update totals for average calculation
+      total_height=$(echo "$total_height + $height" | bc)
+      total_weight=$(echo "$total_weight + $weight" | bc)
+      ((count++))
+    else
+      # Log error if data is invalid
+      echo "Invalid data in $POKEMON_FILE" >> "$ERROR_FILE"
+    fi
+  else
+    echo "$POKEMON_FILE not found" >> "$ERROR_FILE"
+  fi
+done
+
+# Calculate the averages using awk
+if [[ $count -gt 0 ]]; then
+  avg_height=$(echo "scale=2; $total_height / $count" | bc)
+  avg_weight=$(echo "scale=2; $total_weight / $count" | bc)
+
+  # Print averages at the end of the CSV file
+  echo "Average Height,$avg_height" >> "$OUTPUT_CSV"
+  echo "Average Weight,$avg_weight" >> "$OUTPUT_CSV"
+  echo "Report generated successfully: $OUTPUT_CSV"
+else
+  echo "No valid data to calculate averages." >> "$ERROR_FILE"
+fi
