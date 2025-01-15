@@ -55,14 +55,20 @@ fetch_pokemon_data() {
   rm -f "$POKEMON.json"
 }
 
+# Array to store job PIDs (process IDs) for background jobs
+declare -a job_pids
+
 # Run the API requests in parallel
 for POKEMON in "${POKEMON_LIST[@]}"; do
   fetch_pokemon_data "$POKEMON" &  # Run each request in the background
+  job_pids+=($!)  # Capture the PID of the background job
   sleep $DELAY  # Delay to prevent rate-limiting issues
 done
 
 # Wait for all background processes to finish
-wait
+for pid in "${job_pids[@]}"; do
+  wait $pid  # Wait for each background job to finish
+done
 
 # Calculate the averages using awk
 if [[ $count -gt 0 ]]; then
