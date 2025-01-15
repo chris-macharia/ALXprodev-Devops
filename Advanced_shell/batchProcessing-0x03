@@ -87,4 +87,4 @@ else
   echo "No valid data to calculate averages." >> "$ERROR_FILE"
 fi
 
-# seed
+# sed
