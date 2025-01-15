@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+
+# Define list of Pokémon
+POKEMON_LIST=("bulbasaur" "ivysaur" "venusaur" "charmander" "charmeleon")
+
+# Define API URL, delay, and file paths
+API_URL="https://pokeapi.co/api/v2/pokemon"
+DELAY=2
+OUTPUT_CSV="pokemon_report.csv"
+ERROR_FILE="errors.txt"
+
+# Initialize the CSV file with headers
+echo "Name,Height,Weight" > "$OUTPUT_CSV"
+
+# Initialize variables to calculate averages
+total_height=0
+total_weight=0
+count=0
+
+# Function to make API request with retries
+make_request() {
+  local POKEMON=$1
+  local attempt=0
+  local success=false
+  
+  while [[ $attempt -lt 3 && $success == false ]]; do
+    # Construct the API request URL for the current Pokémon
+    URL="$API_URL/$POKEMON"
+
+    # Make the API request and capture status code
+    response=$(curl -s -w "%{http_code}" -o "$POKEMON.json" "$URL")
+    status_code=$(echo "$response" | tail -n1)
+    
+    if [[ "$status_code" -eq 200 ]]; then
+      success=true
+      return 0
+    else
+      ((attempt++))
+      echo "Attempt $attempt for $POKEMON failed with status code $status_code."
+      sleep $DELAY
+    fi
+  done
+
+  return 1
+}
+
+# Loop through each Pokémon in the list
+for POKEMON in "${POKEMON_LIST[@]}"; do
+  if make_request "$POKEMON"; then
+    # Extract name, height, and weight from the successfully fetched JSON file
+    name=$(jq -r '.name' "$POKEMON.json")
+    height=$(jq -r '.height' "$POKEMON.json")
+    weight=$(jq -r '.weight' "$POKEMON.json")
+    
+    # Check if the values are valid numbers
+    if [[ "$height" =~ ^[0-9]+(\.[0-9]+)?$ ]] && [[ "$weight" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+      # Add data to the CSV
+      echo "$name,$height,$weight" >> "$OUTPUT_CSV"
+      
+      # Update totals for average calculation
+      total_height=$(echo "$total_height + $height" | bc)
+      total_weight=$(echo "$total_weight + $weight" | bc)
+      ((count++))
+    else
+      # Log error if data is invalid
+      echo "Invalid data in $POKEMON.json" >> "$ERROR_FILE"
+    fi
+  else
+    # Log error if all attempts fail
+    echo "Failed to fetch data for $POKEMON after 3 attempts." >> "$ERROR_FILE"
+  fi
+
+  # Delay to prevent rate-limiting issues
+  sleep $DELAY
+done
+
+# Calculate the averages using awk
+if [[ $count -gt 0 ]]; then
+  avg_height=$(echo "scale=2; $total_height / $count" | bc)
+  avg_weight=$(echo "scale=2; $total_weight / $count" | bc)
+
+  # Print averages at the end of the CSV file
+  echo "Average Height,$avg_height" >> "$OUTPUT_CSV"
+  echo "Average Weight,$avg_weight" >> "$OUTPUT_CSV"
+  echo "Report generated successfully: $OUTPUT_CSV"
+else
+  echo "No valid data to calculate averages." >> "$ERROR_FILE"
+fi
