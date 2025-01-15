@@ -34,3 +34,5 @@ for POKEMON in "${POKEMON_LIST[@]}"; do
   # Clean up temporary file
   rm -f temp_status
 done
+
+# 3
