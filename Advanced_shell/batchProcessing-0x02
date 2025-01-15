@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+
+# Define list of Pokémon
+POKEMON_LIST=("bulbasaur" "ivysaur" "venusaur" "charmander" "charmeleon")
+
+# Define API URL and delay (in seconds)
+API_URL="https://pokeapi.co/api/v2/pokemon"
+DELAY=2
+
+# Loop through each Pokémon
+for POKEMON in "${POKEMON_LIST[@]}"; do
+  # Construct the API request URL for the current Pokémon
+  URL="$API_URL/$POKEMON"
+  
+  # Define the output file name based on the Pokémon name
+  OUTPUT_FILE="${POKEMON}.json"
+  ERROR_FILE="errors.txt"
+  
+  # Make the API request
+  curl -s -o "$OUTPUT_FILE" -w "%{http_code}" "$URL" > temp_status
+  
+  # Check if the request was successful (HTTP status 200)
+  STATUS_CODE=$(cat temp_status)
+  if [[ "$STATUS_CODE" -eq 200 ]]; then
+    echo "Successfully fetched data for $POKEMON. Saved to $OUTPUT_FILE."
+  else
+    echo "Failed to fetch data for $POKEMON. Status code: $STATUS_CODE" >> "$ERROR_FILE"
+    echo "Error details logged in $ERROR_FILE."
+  fi
+
+  # Delay to prevent rate-limiting issues
+  sleep $DELAY
+  
+  # Clean up temporary file
+  rm -f temp_status
+done
